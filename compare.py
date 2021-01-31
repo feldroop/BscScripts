@@ -2,6 +2,7 @@ import os
 import subprocess
 import time
 import argparse 
+import asyncio
 
 #################################### configuration ####################################
 parser = argparse.ArgumentParser(description="Count k-mers from files, run different packing algorithms and evaluate results",
@@ -59,23 +60,21 @@ print_and_log(
     f"threads    : {THREADS}\n"
 )
 
-def handle_outputs(proc, name, filename, with_stderr):
+def handle_outputs(returncode, stdout, stderr, name, filename, with_stderr):
     '''If the process errored, print the error, else write stdout to a file'''
-    try:
-        proc.check_returncode()
-    except:
+    if returncode != 0:
         print_and_log(f"---------- {name} failed with the following output: ----------\n\n"
               f"---------- stdout ----------\n"
-              f"{proc.stdout.decode('utf-8')}\n"
+              f"{stdout.decode('utf-8')}\n"
               f"---------- stderr ----------\n"
-              f"{proc.stderr.decode('utf-8')}\n"
+              f"{stderr.decode('utf-8')}\n"
         )
         quit()
     
-    output_str = proc.stdout.decode('utf-8')
+    output_str = stdout.decode('utf-8')
     
     if with_stderr:
-        output_str += proc.stderr.decode('utf-8')
+        output_str += stderr.decode('utf-8')
     
     with open(filename, "w+") as f:
         f.write(output_str)
@@ -119,27 +118,36 @@ def run_pack(extra_flags, name):
         capture_output=True
         )
 
-    handle_outputs(pack_proc, f"chopper pack with {name}", output_filename, True)
+    handle_outputs(pack_proc.returncode, pack_proc.stdout, pack_proc.stderr, f"chopper pack with {name}", output_filename, True)
 
     for line in pack_proc.stdout.decode("utf-8").splitlines():
         if 'optimum' in line:
             print_and_log(f"---------- packing with {name} done. {line} ----------")
 
-def evaluate(name):
+async def evaluate_async(name):
+    # count_HIBF_kmers_based_on_binning is not multithreaded
+    # therefore we use asyncio to perform all three evalutations at the same time
     binning_filename = OUTPUT_DIR + name + ".binning"
 
-    evaluation_proc = subprocess.run([
+    evaluation_proc = await asyncio.create_subprocess_shell(" ".join([
         BINARY_DIR + "count_HIBF_kmers_based_on_binning", 
         "-f", binning_filename,
         "-k", str(KMER_SIZE),
-        ],
-        capture_output=True
+        ]),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
     )
 
-    output_filename = OUTPUT_DIR + f"evaluation_{name}.txt"
-    handle_outputs(evaluation_proc, f"count_HIBF_kmers_based_on_binning for the {name}", output_filename, True)
+    stdout, stderr = await evaluation_proc.communicate()
 
-    evaluation_output = evaluation_proc.stderr.decode('utf-8')
+    return stdout, stderr, evaluation_proc.returncode
+
+def evaluate_safe(stdout, stderr, returncode, name):
+    # this part of the evaluation should not be asynchrone
+    output_filename = OUTPUT_DIR + f"evaluation_{name}.txt"
+    handle_outputs(returncode, stdout, stderr, f"count_HIBF_kmers_based_on_binning for the {name}", output_filename, True)
+
+    evaluation_output = stderr.decode('utf-8')
     maxi, splits, merges, low_level_size = analyze_result(evaluation_output)
     print_and_log(
         f"---------- evaluating with {name} done. ----------\n\n"
@@ -164,8 +172,8 @@ if not NO_RECOUNT:
         ],
         capture_output=True
         )
-
-    handle_outputs(count_proc, "chopper count", kmer_counts_filename, False)
+    
+    handle_outputs(count_proc.returncode, count_proc.stdout, count_proc.stderr, "chopper count", kmer_counts_filename, False)
 
 print_and_log("---------- k-mer counting done ----------\n")
 
@@ -180,11 +188,16 @@ run_pack(["-u", "-r"], "resort")
 
 print_and_log('\n')
 
-# run count_HIBF_kmers_based_on_binning for the reference result
-evaluate("reference")
+# run count_HIBF_kmers_based_on_binning for the reference, unions and resort result
+async def evaluate_all():
+    reference, union, resort = await asyncio.gather(
+        evaluate_async("reference"), 
+        evaluate_async("union"), 
+        evaluate_async("resort")
+    )
 
-# run count_HIBF_kmers_based_on_binning for the unions result
-evaluate("union")
+    evaluate_safe(*reference, "reference")
+    evaluate_safe(*union, "union")
+    evaluate_safe(*resort, "resort")
 
-# run count_HIBF_kmers_based_on_binning for the resort result
-evaluate("resort")
+asyncio.run(evaluate_all())
