@@ -1,6 +1,5 @@
 import os 
 import argparse
-import math
 import random 
 
 DATA_DIR = "/home/felix/data/bsc_thesis/real_archaea_dataset/2021-01-27_20-12-17/files/"
@@ -11,7 +10,7 @@ parser = argparse.ArgumentParser(description="Generate a file with the names of 
 
 parser.add_argument("data_dir", help="The directory where the files are stored.")
 parser.add_argument("out_file", help="The location where the output file should be created")
-parser.add_argument("-m", "--max-number", type=int, default=math.inf, 
+parser.add_argument("-m", "--max-number", type=int, default=1000000000000, 
                     help="The maximum number of files to include in the list. If not all are included, the subset is picked at random.")
 
 args = parser.parse_args()
