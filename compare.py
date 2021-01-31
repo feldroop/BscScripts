@@ -17,6 +17,7 @@ parser.add_argument("-k", "--kmers", default=20, type=int, help="The size of the
 parser.add_argument("-a", "--alpha", default=1, type=int, help="The alpha for the internal binning algorithm.")
 parser.add_argument("-s", "--sketch-bits", default=12, type=int, 
                     help="The number of bits to distribute values for the HyperLogLog sketches.")
+parser.add_argument("-t", "--threads", default=1, type=int, help="The number of threads to use.")
 parser.add_argument("-x", "--no-recount", action='store_true', 
                     help="If given, chopper count is not invoked and kmer_counts.txt from output dir is used.")
 
@@ -29,6 +30,7 @@ BINARY_DIR = args.binary_dir
 KMER_SIZE = args.kmers
 
 PACK_BINS = args.bins
+THREADS = args.threads
 PACK_ALPHA = args.alpha
 SKETCH_BITS = args.sketch_bits
 
@@ -54,6 +56,7 @@ print_and_log(
     f"pack bins  : {PACK_BINS}\n"
     f"pack alpha : {PACK_ALPHA}\n"
     f"sketch bits: {SKETCH_BITS}\n"
+    f"threads    : {THREADS}\n"
 )
 
 def handle_outputs(proc, name, filename, with_stderr):
@@ -110,6 +113,7 @@ def run_pack(extra_flags, name):
         "-k", str(KMER_SIZE),
         "-a", str(PACK_ALPHA),
         "-s", str(SKETCH_BITS),
+        "-t", str(THREADS),
         "-o", binning_filename
         ] + extra_flags,
         capture_output=True
@@ -127,7 +131,7 @@ def evaluate(name):
     evaluation_proc = subprocess.run([
         BINARY_DIR + "count_HIBF_kmers_based_on_binning", 
         "-f", binning_filename,
-        "-k", str(KMER_SIZE)
+        "-k", str(KMER_SIZE),
         ],
         capture_output=True
     )
@@ -155,6 +159,7 @@ if not NO_RECOUNT:
         "count",
         "-f", SEQ_LIST,
         "-k", str(KMER_SIZE),
+        "-t", str(THREADS),
         "--disable-minimizers"
         ],
         capture_output=True
