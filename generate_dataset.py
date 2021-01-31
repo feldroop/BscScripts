@@ -17,6 +17,7 @@ parser = argparse.ArgumentParser(description="Generate random dna sequences with
 
 parser.add_argument("output_dir", help="The directory where all output files are placed.")
 
+parser.add_argument("-m", "--mason", default="", help="The path to the mason2 binary dir.")
 parser.add_argument("-s", "--singulars", required=True, help="Sizes of genomes that are generated once.")
 parser.add_argument("-p", "--parents", required=True, help="Sizes of genomes that are generated once and have children.")
 parser.add_argument("-c", "--children", required=True, type=int, help="Number Of children per parent.")
@@ -32,6 +33,8 @@ SINGULAR_FASTA_DIR = OUTPUT_DIR + "singular_genomes_fasta/"
 PARENT_FASTA_DIR = OUTPUT_DIR + "parent_genomes_fasta/"
 CHILD_VCF_DIR = OUTPUT_DIR + "child_genomes_vcf/"
 CHILD_FASTA_DIR = OUTPUT_DIR + "child_genomes_fasta/"
+
+MASON_DIR = args.mason
 
 # genome generation
 SINGULAR_GENOME_SIZES = ast.literal_eval(args.singulars.strip(' '))
@@ -122,7 +125,7 @@ for parent, parent_filename in enumerate(parent_filenames):
 
         proc = subprocess.run(
             [
-            "mason_variator", "--verbose",
+            MASON_DIR + "mason_variator", "--verbose",
             "--seed", str(next_random()),
             "--snp-rate", str(SNP_RATE),
             "--small-indel-rate", str(SMALL_INDEL_RATE), 
