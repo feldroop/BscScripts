@@ -30,9 +30,13 @@ make test
 
 ## 2. Generate datasets
 
+Clone this repository.
+
 The `generate_dataset.py` script randomly generates a dataset of dna sequences. For more details see the help menu of the script. You can pass the parameters on the command line or write them into a file and pass the filename with `@`.
 
 ```
+git clone https://github.com/Felix-Droop/BscScripts
+
 python generate_dataset.py --help
 python generate_dataset.py @config/generate_dataset_example.config
 ```
