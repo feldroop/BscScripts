@@ -12,7 +12,7 @@ parser.add_argument("output_dir", help="The directory where all output files are
 parser.add_argument("seqfile_list_file", help="The file for chopper pack in which all sequence files are listed.")
 parser.add_argument("binary_dir", help="The bianry directory of chopper.")
 
-
+parser.add_argument("-c", "--hll-cache-dir", required=True, help="The dir where the hlls are cached.")
 parser.add_argument("-b", "--bins", type=int, required=True, help="The number of technical bins for chopper pack.")
 parser.add_argument("-k", "--kmers", default=20, type=int, help="The size of the k-mers.")
 parser.add_argument("-a", "--alpha", default=1, type=int, help="The alpha for the internal binning algorithm.")
@@ -27,6 +27,7 @@ args = parser.parse_args()
 OUTPUT_DIR = args.output_dir
 SEQ_LIST = args.seqfile_list_file
 BINARY_DIR = args.binary_dir
+HLL_CACHE_DIR = args.hll_cache_dir
 
 KMER_SIZE = args.kmers
 
@@ -108,6 +109,7 @@ def run_pack(extra_flags, name):
         BINARY_DIR + "chopper", 
         "pack",
         "-f", kmer_counts_filename,
+        "-c", str(HLL_CACHE_DIR),
         "-b", str(PACK_BINS),
         "-k", str(KMER_SIZE),
         "-a", str(PACK_ALPHA),
