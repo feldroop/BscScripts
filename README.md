@@ -65,6 +65,7 @@ genome_updater.sh \
 -l "Complete Genome" \
 -f "genomic.fna.gz" \
 -t 16 \
+-m \
 -o "/path/to/dataset/dir/"
 ```
 
