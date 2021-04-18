@@ -8,7 +8,8 @@ The goal of this repository is to enable everyone to reproduce the tests and ben
 * Python 3. I use version 3.8.5.
 * GCC. I use version 9.3.0.
 * CMake. I use version 3.16.3.
-* The Python library `more_itertools` (`pip install` ...). Only needed for the `generate_datasets.py` script.
+* The Python library `more_itertools` (`pip install more_itertools`). Only needed for the `generate_datasets.py` script.
+* The Python library `psutils` (`pip install psutils`) Only needed for the `compare.py` script.
 * The SeqAn application `mason2`, download [here](http://packages.seqan.de/mason2/). Only needed for the `generate_datasets.py` script.
 * Dependencies of `genome_updater`, see [here](https://github.com/pirovc/genome_updater). Only needed to download the real dataset.
 

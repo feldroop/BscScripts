@@ -23,7 +23,7 @@ parser.add_argument("-c", "--hll-cache-dir", required=True, help="The dir where 
                     type=pathlib.Path)
 parser.add_argument("-l", "--log", default=f"{timestamp}_log.txt", help="The name for the log file (not the whole path).")
 parser.add_argument("-b", "--bins", required=True, type=int, help="The number of technical bins for chopper pack.")
-parser.add_argument("-k", "--kmers", default=20, type=int, help="The size of the k-mers.")
+parser.add_argument("-k", "--kmer-size", default=20, type=int, help="The size of the k-mers.")
 parser.add_argument("-a", "--alpha", default=1.2, type=float, help="The alpha for the internal binning algorithm.")
 parser.add_argument("-s", "--sketch-bits", default=12, type=int, 
                     help="The number of bits to distribute values for the HyperLogLog sketches.")
@@ -57,7 +57,7 @@ print_and_log(
     f"hll cache       : {args.hll_cache_dir}\n"
     f"log file        : {log_path}\n\n"
     f"pack bins  : {args.bins}\n"
-    f"k-mer size : {args.kmers}\n"
+    f"k-mer size : {args.kmer_size}\n"
     f"pack alpha : {args.alpha}\n"
     f"sketch bits: {args.sketch_bits}\n"
     f"max ratio  : {args.max_ratio}\n"
@@ -131,7 +131,7 @@ def run_pack(extra_flags, name):
         "-f", kmer_counts_filename,
         "-c", str(args.hll_cache_dir),
         "-b", str(args.bins),
-        "-k", str(args.kmers),
+        "-k", str(args.kmer_size),
         "-a", str(args.alpha),
         "-s", str(args.sketch_bits),
         "-t", str(args.threads),
@@ -169,7 +169,7 @@ def evaluate(name):
         str(args.binary_dir / "count_HIBF_kmers_based_on_binning"), 
         "-f", binning_filename,
         "-c", kmer_counts_filename,
-        "-k", str(args.kmers),
+        "-k", str(args.kmer_size),
         "-t", str(args.threads)
         ],
         encoding='utf-8',
@@ -205,7 +205,7 @@ if not args.no_recount:
         str(args.binary_dir / "chopper"), 
         "count",
         "-f", str(args.seqfile_list_file),
-        "-k", str(args.kmers),
+        "-k", str(args.kmer_size),
         "-t", str(args.threads),
         "--disable-minimizers"
         ],
