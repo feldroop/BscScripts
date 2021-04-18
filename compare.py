@@ -12,11 +12,11 @@ timestamp = f"{t.tm_year}-{t.tm_mon}-{t.tm_mday}_{t.tm_hour}-{t.tm_min}-{ t.tm_s
 parser = argparse.ArgumentParser(description="Count k-mers from files, run different packing algorithms and evaluate results",
                                  fromfile_prefix_chars='@')
 
-parser.add_argument("output_dir", help="The directory where all output files are placed.", 
+parser.add_argument("output-dir", help="The directory where all output files are placed.", 
                     type=pathlib.Path)
-parser.add_argument("seqfile_list_file", help="The file for chopper pack in which all sequence files are listed.",
+parser.add_argument("seqfile-list-file", help="The file for chopper pack in which all sequence files are listed.",
                     type=pathlib.Path)
-parser.add_argument("binary_dir", help="The binary directory of chopper.", 
+parser.add_argument("binary-dir", help="The binary directory of chopper.", 
                     type=pathlib.Path)
 
 parser.add_argument("-c", "--hll-cache-dir", required=True, help="The dir where the hlls are cached.",
@@ -27,7 +27,7 @@ parser.add_argument("-k", "--kmer-size", default=20, type=int, help="The size of
 parser.add_argument("-a", "--alpha", default=1.2, type=float, help="The alpha for the internal binning algorithm.")
 parser.add_argument("-s", "--sketch-bits", default=12, type=int, 
                     help="The number of bits to distribute values for the HyperLogLog sketches.")
-parser.add_argument("-m", "--max_ratio", default=0.5, type=float, 
+parser.add_argument("-m", "--max-ratio", default=0.5, type=float, 
                     help="The maximal cardinality ratio in the clustering intervals (must be < 1).")
 parser.add_argument("-t", "--threads", default=1, type=int, help="The number of threads to use.")
 parser.add_argument("-x", "--no-recount", action='store_true', 
