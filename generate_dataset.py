@@ -5,6 +5,7 @@ import os
 import subprocess
 import argparse 
 import ast 
+import pathlib 
 
 import random
 import math
@@ -15,9 +16,9 @@ from more_itertools import chunked
 parser = argparse.ArgumentParser(description="Generate random dna sequences with singular genomes and parent genomes with children.",
                                  fromfile_prefix_chars='@')
 
-parser.add_argument("output_dir", help="The directory where all output files are placed.")
+parser.add_argument("output_dir", help="The directory where all output files are placed.", type=pathlib.Path)
 
-parser.add_argument("-m", "--mason", default="", help="The path to the mason2 binary dir.")
+parser.add_argument("-m", "--mason", default="", help="The path to the mason2 binary dir.", type=pathlib.Path)
 parser.add_argument("-s", "--singulars", required=True, help="Sizes of genomes that are generated once.")
 parser.add_argument("-p", "--parents", required=True, help="Sizes of genomes that are generated once and have children.")
 parser.add_argument("-c", "--children", required=True, type=int, help="Number Of children per parent.")
@@ -29,10 +30,10 @@ parser.add_argument("-r", "--random-seeds", default=None,
 args = parser.parse_args()
 
 OUTPUT_DIR = args.output_dir
-SINGULAR_FASTA_DIR = OUTPUT_DIR + "singular_genomes_fasta/"
-PARENT_FASTA_DIR = OUTPUT_DIR + "parent_genomes_fasta/"
-CHILD_VCF_DIR = OUTPUT_DIR + "child_genomes_vcf/"
-CHILD_FASTA_DIR = OUTPUT_DIR + "child_genomes_fasta/"
+SINGULAR_FASTA_DIR = OUTPUT_DIR / "singular_genomes_fasta/"
+PARENT_FASTA_DIR = OUTPUT_DIR / "parent_genomes_fasta/"
+CHILD_VCF_DIR = OUTPUT_DIR / "child_genomes_vcf/"
+CHILD_FASTA_DIR = OUTPUT_DIR / "child_genomes_fasta/"
 
 MASON_DIR = args.mason
 
@@ -79,6 +80,11 @@ total_genomes = len(SINGULAR_GENOME_SIZES) + (1 + CHILD_GENOMES_PER_PARENT) * le
 bits = math.ceil(math.log10(total_genomes))
 number_fmt = lambda i: f'{i:0{bits}d}'
 
+# make sure no other dataset is overwriten
+if os.path.exists(OUTPUT_DIR):
+    print(f"\nThe output directory {OUTPUT_DIR} already exists. Please choose another one or delete the current one.\n")
+    quit()
+
 # create all directories
 os.mkdir(OUTPUT_DIR)
 os.mkdir(SINGULAR_FASTA_DIR)
@@ -88,7 +94,7 @@ os.mkdir(CHILD_FASTA_DIR)
 
 def write_random_seq(filename, name, size):
     '''Write a random dna sequence with given size to a fasta file with given filename'''
-    with open(filename, "w+") as f:
+    with open(filepath, "w+") as f:
         f.write(">" + name + "\n")
         seq_gen = (random.choice(('A', 'C', 'G', 'T')) for _ in range(size))
         for seq_line in chunked(seq_gen, 80):
@@ -100,38 +106,38 @@ completed_processes = []
 # generate singular genomes
 for i, size in enumerate(SINGULAR_GENOME_SIZES):
     name = "singular_" + number_fmt(i)
-    filename = SINGULAR_FASTA_DIR + name + ".fasta"
-    fasta_file_listing += filename + '\n'
+    filepath = SINGULAR_FASTA_DIR / (name + ".fasta")
+    fasta_file_listing += str(filepath) + '\n'
 
-    write_random_seq(filename, name, size)
+    write_random_seq(filepath, name, size)
 
-parent_filenames = []
+parent_filepaths = []
 # generate parent genomes
 for i, size in enumerate(PARENT_GENOME_SIZES):
     name = "init_" + number_fmt(i)
-    filename = PARENT_FASTA_DIR + name + ".fasta"
-    parent_filenames.append(filename)
-    fasta_file_listing += filename + '\n'
+    filepath = PARENT_FASTA_DIR / (name + ".fasta")
+    parent_filepaths.append(filepath)
+    fasta_file_listing += str(filepath) + '\n'
 
-    write_random_seq(filename, name, size)
+    write_random_seq(filepath, name, size)
 
 # create child genomes with mason_variate
-for parent, parent_filename in enumerate(parent_filenames):
+for parent, parent_filepath in enumerate(parent_filepaths):
     for child in range(CHILD_GENOMES_PER_PARENT):
-        vcf_filename = CHILD_VCF_DIR + "child_" + number_fmt(parent) + "_" + number_fmt(child) + ".vcf"
-        fasta_filename = CHILD_FASTA_DIR + "child_" + number_fmt(parent) + "_" + number_fmt(child) + ".fasta"
+        vcf_filepath = CHILD_VCF_DIR / ("child_" + number_fmt(parent) + "_" + number_fmt(child) + ".vcf")
+        fasta_filepath = CHILD_FASTA_DIR / ("child_" + number_fmt(parent) + "_" + number_fmt(child) + ".fasta")
 
-        fasta_file_listing += fasta_filename + '\n'
+        fasta_file_listing += str(fasta_filepath) + '\n'
 
         proc = subprocess.run(
             [
-            MASON_DIR + "mason_variator", "--verbose",
+            str(MASON_DIR / "mason_variator"), "--verbose",
             "--seed", str(next_random()),
             "--snp-rate", str(SNP_RATE),
             "--small-indel-rate", str(SMALL_INDEL_RATE), 
-            "-ir", parent_filename,
-            "-ov", vcf_filename,
-            "-of", fasta_filename,
+            "-ir", str(parent_filepath),
+            "-ov", str(vcf_filepath),
+            "-of", str(fasta_filepath),
             ],
             capture_output=True
         )
@@ -143,14 +149,14 @@ for parent, parent_filename in enumerate(parent_filenames):
 stdout = "".join(map(lambda proc: proc.stdout.decode("ascii"), completed_processes))
 stderr = "".join(map(lambda proc: proc.stderr.decode("ascii"), completed_processes))
 
-with open(OUTPUT_DIR + "mason_stdout.txt", "w+") as f:
+with open(OUTPUT_DIR / "mason_stdout.txt", "w+") as f:
     f.write(stdout)
 
-with open(OUTPUT_DIR + "mason_stderr.txt", "w+") as f:
+with open(OUTPUT_DIR / "mason_stderr.txt", "w+") as f:
     f.write(stderr)
 
 # write file that lists all generated fasta files
-with open(OUTPUT_DIR + "fasta_file_listing.txt", "w+") as f:
+with open(OUTPUT_DIR / "fasta_file_listing.txt", "w+") as f:
     f.write(fasta_file_listing)
 
 # write info file with some info about what was generated
@@ -168,7 +174,7 @@ config_summary = (
     "------------------------------------------------------------------------\n"
 )
 
-with open(OUTPUT_DIR + "config_summary.txt", "w+") as f:
+with open(OUTPUT_DIR / "config_summary.txt", "w+") as f:
     f.write(config_summary)
 
-print("Succesfully generated the dataset to " + OUTPUT_DIR)
+print(f"Succesfully generated the dataset to {OUTPUT_DIR}")
