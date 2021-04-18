@@ -2,7 +2,7 @@ import os
 import argparse
 import pathlib 
 import time
-import psutil
+import subprocess
 
 # timestamp
 t = time.localtime()
@@ -65,19 +65,9 @@ print_and_log(
     f"no recount : {args.no_recount}\n"
 )
 
-def wait_and_measure(proc):
-    peak_memory = 0
-    while proc.poll() is None:
-        peak_memory = max(peak_memory, proc.memory_info().rss)
-
-        # wait half a second until aksing again for the memory
-        time.sleep(0.001)
-
-    return peak_memory
-
-def handle_outputs(proc, name, filename, with_stderr):
+def handle_outputs(proc, name, filename, chopper_count):
     '''If the process errored, print the error, else write stdout to a file'''
-    stdout, stderr = proc.stdout.read(), proc.stderr.read()
+    stdout, stderr = proc.stdout, proc.stderr
 
     if proc.returncode != 0:
         print_and_log(f"---------- {name} failed with the following output: ----------\n\n"
@@ -89,8 +79,14 @@ def handle_outputs(proc, name, filename, with_stderr):
         quit()
     
     output_str = stdout
-    
-    if with_stderr:
+    if chopper_count:
+        # crop the line where peak memory usage is printed
+        temp = ""
+        for line in stdout.splitlines():
+            if not "peak memory usage" in line:
+                temp += line + '\n'
+        output_str = temp
+    else:
         output_str += "---------- stderr ----------\n" + stderr
     
     with open(filename, "w+") as f:
@@ -125,7 +121,7 @@ def run_pack(extra_flags, name):
 
     start_time = time.perf_counter()
 
-    pack_proc = psutil.Popen([
+    pack_proc = subprocess.run([
         str(args.binary_dir / "chopper"), 
         "pack",
         "-f", kmer_counts_filename,
@@ -139,33 +135,27 @@ def run_pack(extra_flags, name):
         "-o", binning_filename
         ] + extra_flags,
         encoding='utf-8',
-        stdout=psutil.subprocess.PIPE,
-        stderr=psutil.subprocess.PIPE
+        capture_output=True
         )
-
-    if args.peak_memory:
-        peak_memory = wait_and_measure(pack_proc)
-    else:
-        pack_proc.wait()
-        peak_memory = "not computed"
     
     elapsed_time = time.perf_counter() - start_time
 
     stdout = handle_outputs(pack_proc, f"chopper pack with {name}", 
-                                    output_filename, True)
+                            output_filename, False)
 
     for line in stdout.splitlines():
         if 'optimum' in line:
             print_and_log(
                 f"---------- packing with {name} done. {line} ----------\n"
-                f"           took {round(elapsed_time, 3)} seconds.\n"
-                f"           peak memory was {peak_memory}.\n"
+                f"           took {round(elapsed_time, 3)} seconds."
             )
+        elif 'peak memory usage' in line:
+            print_and_log("           " + line + '\n')
 
 def evaluate(name):
     binning_filename = args.output_dir / (name + ".binning")
 
-    proc = psutil.Popen([
+    proc = subprocess.run([
         str(args.binary_dir / "count_HIBF_kmers_based_on_binning"), 
         "-f", binning_filename,
         "-c", kmer_counts_filename,
@@ -173,15 +163,12 @@ def evaluate(name):
         "-t", str(args.threads)
         ],
         encoding='utf-8',
-        stdout=psutil.subprocess.PIPE,
-        stderr=psutil.subprocess.PIPE
+        capture_output=True
     )
-
-    proc.wait()
 
     output_filename = args.output_dir / f"evaluation_{name}.txt"
     stdout = handle_outputs(proc, f"count_HIBF_kmers_based_on_binning for the {name}", 
-                                    output_filename, True)
+                            output_filename, False)
 
     maxi, splits, merges, low_level_size = analyze_result(stdout)
     print_and_log(
@@ -196,12 +183,12 @@ def evaluate(name):
         )
 
 elapsed_time = 0
-peak_memory = 0
+stdout = ""
 if not args.no_recount:
     # run chopper count on the fasta listing
     start_time = time.perf_counter()
 
-    count_proc = psutil.Popen([
+    count_proc = subprocess.run([
         str(args.binary_dir / "chopper"), 
         "count",
         "-f", str(args.seqfile_list_file),
@@ -210,25 +197,21 @@ if not args.no_recount:
         "--disable-minimizers"
         ],
         encoding='utf-8',
-        stdout=psutil.subprocess.PIPE,
-        stderr=psutil.subprocess.PIPE
+        capture_output=True
         )
-    
-    if args.peak_memory:
-        peak_memory = wait_and_measure(count_proc)
-    else:
-        count_proc.wait()
-        peak_memory = "not computed"
     
     elapsed_time = time.perf_counter() - start_time
 
-    handle_outputs(count_proc, "chopper count", kmer_counts_filename, False)
+    stdout = handle_outputs(count_proc, "chopper count", kmer_counts_filename, True)
 
 print_and_log(
     f"---------- k-mer counting done ----------\n"
-    f"           took {round(elapsed_time, 3)} seconds.\n"
-    f"           peak memory was {peak_memory}.\n"
+    f"           took {round(elapsed_time, 3)} seconds."
 )
+
+for line in stdout.splitlines():
+    if 'peak memory usage' in line:
+        print_and_log("           " + line + '\n')
 
 # run chopper pack WITHOUT union estimates
 run_pack([], "reference")
