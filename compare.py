@@ -65,34 +65,24 @@ print_and_log(
     f"no recount : {args.no_recount}\n"
 )
 
-def handle_outputs(proc, name, filename, chopper_count):
+def handle_outputs(proc, name, filename):
     '''If the process errored, print the error, else write stdout to a file'''
-    stdout, stderr = proc.stdout, proc.stderr
+
+    message = (
+        f"---------- stdout ----------\n"
+        f"{proc.stdout}\n"
+        f"---------- stderr ----------\n"
+        f"{proc.stderr}\n"
+    )
 
     if proc.returncode != 0:
         print_and_log(f"---------- {name} failed with the following output: ----------\n\n"
-              f"---------- stdout ----------\n"
-              f"{stdout}\n"
-              f"---------- stderr ----------\n"
-              f"{stderr}\n"
+                      f"{message}"
         )
         quit()
     
-    output_str = stdout
-    if chopper_count:
-        # crop the line where peak memory usage is printed
-        temp = ""
-        for line in stdout.splitlines():
-            if not "peak memory usage" in line:
-                temp += line + '\n'
-        output_str = temp
-    else:
-        output_str += "---------- stderr ----------\n" + stderr
-    
     with open(filename, "w+") as f:
-        f.write(output_str)
-    
-    return stdout
+        f.write(message)
 
 def analyze_result(s):
     '''Find the biggest technical bin from count_HIBF_kmers_based_on_binning output'''
@@ -122,10 +112,10 @@ def run_pack(extra_flags, name):
     start_time = time.perf_counter()
 
     pack_proc = subprocess.run([
-        str(args.binary_dir / "chopper"), 
+        args.binary_dir / "chopper", 
         "pack",
         "-f", kmer_counts_filename,
-        "-c", str(args.hll_cache_dir),
+        "-c", args.hll_cache_dir,
         "-b", str(args.bins),
         "-k", str(args.kmer_size),
         "-a", str(args.alpha),
@@ -140,10 +130,9 @@ def run_pack(extra_flags, name):
     
     elapsed_time = time.perf_counter() - start_time
 
-    stdout = handle_outputs(pack_proc, f"chopper pack with {name}", 
-                            output_filename, False)
+    handle_outputs(pack_proc, f"chopper pack with {name}", output_filename)
 
-    for line in stdout.splitlines():
+    for line in pack_proc.stdout.splitlines():
         if 'optimum' in line:
             print_and_log(
                 f"---------- packing with {name} done. {line} ----------\n"
@@ -156,7 +145,7 @@ def evaluate(name):
     binning_filename = args.output_dir / (name + ".binning")
 
     proc = subprocess.run([
-        str(args.binary_dir / "count_HIBF_kmers_based_on_binning"), 
+        args.binary_dir / "count_HIBF_kmers_based_on_binning", 
         "-f", binning_filename,
         "-c", kmer_counts_filename,
         "-k", str(args.kmer_size),
@@ -167,10 +156,9 @@ def evaluate(name):
     )
 
     output_filename = args.output_dir / f"evaluation_{name}.txt"
-    stdout = handle_outputs(proc, f"count_HIBF_kmers_based_on_binning for the {name}", 
-                            output_filename, False)
+    handle_outputs(proc, f"count_HIBF_kmers_based_on_binning for the {name}", output_filename)
 
-    maxi, splits, merges, low_level_size = analyze_result(stdout)
+    maxi, splits, merges, low_level_size = analyze_result(proc.stdout)
     print_and_log(
         f"---------- evaluating with {name} done. ----------\n\n"
         f"Number of split  bins: {splits}\n"
@@ -179,7 +167,7 @@ def evaluate(name):
         f"High level k-mers    : {maxi * args.bins}\n"
         f"Low  level k-mers    : {low_level_size}\n"
         f"Total k-mers (alpha) : {maxi * args.bins + low_level_size}\n\n"
-        f"{stdout if len(stdout.splitlines()) <= 64 else ''}"
+        f"{proc.stdout if len(proc.stdout.splitlines()) <= 64 else ''}"
         )
 
 elapsed_time = 0
@@ -189,9 +177,10 @@ if not args.no_recount:
     start_time = time.perf_counter()
 
     count_proc = subprocess.run([
-        str(args.binary_dir / "chopper"), 
+        args.binary_dir / "chopper", 
         "count",
-        "-f", str(args.seqfile_list_file),
+        "-f", args.seqfile_list_file,
+        "-o", kmer_counts_filename,
         "-k", str(args.kmer_size),
         "-t", str(args.threads),
         "--disable-minimizers"
@@ -202,7 +191,9 @@ if not args.no_recount:
     
     elapsed_time = time.perf_counter() - start_time
 
-    stdout = handle_outputs(count_proc, "chopper count", kmer_counts_filename, True)
+    output_filename = args.output_dir / "count_outputs.txt"
+    handle_outputs(count_proc, "chopper count", output_filename)
+    stdout = count_proc.stdout
 
 print_and_log(
     f"---------- k-mer counting done ----------\n"
