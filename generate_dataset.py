@@ -7,10 +7,9 @@ import argparse
 import ast 
 import pathlib 
 
-import random
 import math
 
-from more_itertools import chunked
+import dna_seq_util
 
 #################################### configuration ####################################
 parser = argparse.ArgumentParser(description="Generate random dna sequences with singular genomes and parent genomes with children.",
@@ -63,7 +62,7 @@ def next_random():
         seed_index += 1
         return RANDOM_SEEDS[seed_index - 1]
 
-random.seed(next_random())
+dna_seq_util.seed(next_random())
 
 #################################### execution ####################################
 
@@ -92,14 +91,6 @@ os.mkdir(PARENT_FASTA_DIR)
 os.mkdir(CHILD_VCF_DIR)
 os.mkdir(CHILD_FASTA_DIR)
 
-def write_random_seq(filename, name, size):
-    '''Write a random dna sequence with given size to a fasta file with given filename'''
-    with open(filepath, "w+") as f:
-        f.write(">" + name + "\n")
-        seq_gen = (random.choice(('A', 'C', 'G', 'T')) for _ in range(size))
-        for seq_line in chunked(seq_gen, 80):
-            f.write("".join(seq_line) + "\n")
-
 fasta_file_listing = ""
 completed_processes = []
 
@@ -109,7 +100,7 @@ for i, size in enumerate(SINGULAR_GENOME_SIZES):
     filepath = SINGULAR_FASTA_DIR / (name + ".fasta")
     fasta_file_listing += str(filepath) + '\n'
 
-    write_random_seq(filepath, name, size)
+    dna_seq_util.write_random_dna_seq_fasta(size, name, filepath, "w+")
 
 parent_filepaths = []
 # generate parent genomes
@@ -119,7 +110,7 @@ for i, size in enumerate(PARENT_GENOME_SIZES):
     parent_filepaths.append(filepath)
     fasta_file_listing += str(filepath) + '\n'
 
-    write_random_seq(filepath, name, size)
+    dna_seq_util.write_random_dna_seq_fasta(size, name, filepath, "w+")
 
 # create child genomes with mason_variate
 for parent, parent_filepath in enumerate(parent_filepaths):
