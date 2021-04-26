@@ -19,7 +19,7 @@ parser.add_argument("seqfile_list_file", help="The file for chopper pack in whic
 parser.add_argument("binary_dir", help="The binary directory of chopper.", 
                     type=pathlib.Path)
 
-parser.add_argument("-c", "--hll-cache-dir", required=True, help="The dir where the hlls are cached.",
+parser.add_argument("-d", "--hll-dir", required=True, help="The dir where the hlls are cached.",
                     type=pathlib.Path)
 parser.add_argument("-l", "--log", default=f"{timestamp}_log.txt", help="The name for the log file (not the whole path).")
 parser.add_argument("-b", "--bins", required=True, type=int, help="The number of technical bins for chopper pack.")
@@ -34,6 +34,8 @@ parser.add_argument("-x", "--no-recount", action='store_true',
                     help="If given, chopper count is not invoked and kmer_counts.txt from output dir is used.")
 parser.add_argument("-p", "--peak-memory", action='store_true',
                     help="If given, the peak memory usage of chopper processes is computed. Might be a slight slow-down.")
+parser.add_argument("-e", "--exclusively-hlls", action='store_true',
+                    help="If given, the hll counts are used for chopper pack instead of the eact counts.")
 
 args = parser.parse_args()
 #################################### execution ####################################
@@ -54,7 +56,7 @@ print_and_log(
     f"output directory: {args.output_dir}\n"
     f"seqfile list    : {args.seqfile_list_file}\n"
     f"chopper binaries: {args.binary_dir}\n"
-    f"hll cache       : {args.hll_cache_dir}\n"
+    f"hll directory   : {args.hll_dir}\n"
     f"log file        : {log_path}\n\n"
     f"pack bins  : {args.bins}\n"
     f"k-mer size : {args.kmer_size}\n"
@@ -63,6 +65,7 @@ print_and_log(
     f"max ratio  : {args.max_ratio}\n"
     f"threads    : {args.threads}\n"
     f"no recount : {args.no_recount}\n"
+    f"hll counts : {args.exclusively_hlls}\n"
 )
 
 def handle_outputs(proc, name, filename):
@@ -103,9 +106,41 @@ def analyze_result(s):
 
     return (maxi, splits, merges, low_level_size)
 
-kmer_counts_filename = args.output_dir / "kmer_counts.txt"
+def run_count(extra_flags, name):
+    kmer_counts_filename = args.output_dir / (name + "_kmer_counts.txt")
+    
+    start_time = time.perf_counter()
+
+    count_proc = subprocess.run([
+        args.binary_dir / "chopper", 
+        "count",
+        "-f", args.seqfile_list_file,
+        "-o", kmer_counts_filename,
+        "-k", str(args.kmer_size),
+        "-t", str(args.threads),
+        "-s", str(args.sketch_bits),
+        "--disable-minimizers",
+        ] + extra_flags,
+        encoding='utf-8',
+        capture_output=True
+    )
+    
+    elapsed_time = time.perf_counter() - start_time
+
+    output_filename = args.output_dir / (name + "_count_outputs.txt")
+    handle_outputs(count_proc, "chopper count", output_filename)
+
+    print_and_log(
+        f"---------- k-mer counting with {name} counts done ----------\n"
+        f"           took {round(elapsed_time, 3)} seconds."
+    )
+
+    for line in count_proc.stdout.splitlines():
+        if 'peak memory usage' in line:
+            print_and_log("           " + line + '\n')
 
 def run_pack(extra_flags, name):
+    kmer_counts_filename = args.output_dir / (("hll" if args.exclusively_hlls else "exact") + "_kmer_counts.txt")
     binning_filename = args.output_dir / (name + ".binning")
     output_filename = args.output_dir / ("pack_" + name + "_full_output.txt")
 
@@ -115,12 +150,9 @@ def run_pack(extra_flags, name):
         args.binary_dir / "chopper", 
         "pack",
         "-f", kmer_counts_filename,
-        "-c", args.hll_cache_dir,
+        "-d", args.hll_dir,
         "-b", str(args.bins),
-        "-k", str(args.kmer_size),
         "-a", str(args.alpha),
-        "-s", str(args.sketch_bits),
-        "-t", str(args.threads),
         "-m", str(args.max_ratio),
         "-o", binning_filename
         ] + extra_flags,
@@ -142,6 +174,7 @@ def run_pack(extra_flags, name):
             print_and_log("           " + line + '\n')
 
 def evaluate(name):
+    kmer_counts_filename = args.output_dir / "exact_kmer_counts.txt"
     binning_filename = args.output_dir / (name + ".binning")
 
     proc = subprocess.run([
@@ -170,39 +203,13 @@ def evaluate(name):
         f"{proc.stdout if len(proc.stdout.splitlines()) <= 64 else ''}"
         )
 
-elapsed_time = 0
-stdout = ""
 if not args.no_recount:
     # run chopper count on the fasta listing
-    start_time = time.perf_counter()
+    run_count([], "exact")
+    run_count(["-e", "-d", str(args.hll_dir)], "hll")
 
-    count_proc = subprocess.run([
-        args.binary_dir / "chopper", 
-        "count",
-        "-f", args.seqfile_list_file,
-        "-o", kmer_counts_filename,
-        "-k", str(args.kmer_size),
-        "-t", str(args.threads),
-        "--disable-minimizers"
-        ],
-        encoding='utf-8',
-        capture_output=True
-        )
-    
-    elapsed_time = time.perf_counter() - start_time
-
-    output_filename = args.output_dir / "count_outputs.txt"
-    handle_outputs(count_proc, "chopper count", output_filename)
-    stdout = count_proc.stdout
-
-print_and_log(
-    f"---------- k-mer counting done ----------\n"
-    f"           took {round(elapsed_time, 3)} seconds."
-)
-
-for line in stdout.splitlines():
-    if 'peak memory usage' in line:
-        print_and_log("           " + line + '\n')
+else:
+    print_and_log("---------- No recount of k-mers done. ----------\n")
 
 # run chopper pack WITHOUT union estimates
 run_pack([], "reference")
