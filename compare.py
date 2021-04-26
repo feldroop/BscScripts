@@ -194,13 +194,12 @@ def evaluate(name):
     maxi, splits, merges, low_level_size = analyze_result(proc.stdout)
     print_and_log(
         f"---------- evaluating with {name} done. ----------\n\n"
-        f"Number of split  bins: {splits}\n"
-        f"Number of merged bins: {merges}\n"
-        f"Maximum technical bin: {maxi}\n"
-        f"High level k-mers    : {maxi * args.bins}\n"
-        f"Low  level k-mers    : {low_level_size}\n"
-        f"Total k-mers (alpha) : {maxi * args.bins + low_level_size}\n\n"
-        f"{proc.stdout if len(proc.stdout.splitlines()) <= 64 else ''}"
+        f"#split bins              : {splits}\n"
+        f"#merged bins             : {merges}\n"
+        f"largest bin              : {maxi}\n"
+        f"largest bin * #bins      : {maxi * args.bins}\n"
+        f"lower level k-mers (sum) : {low_level_size}\n"
+        f"\n{proc.stdout if len(proc.stdout.splitlines()) <= 64 else ''}"
         )
 
 if not args.no_recount:
@@ -217,10 +216,10 @@ run_pack([], "reference")
 # run chopper pack WITH union estimates
 run_pack(["-u"], "union")
 
-# run chopper pack WITH union estimates AND resorting
-run_pack(["-u", "-r"], "resort")
+# run chopper pack WITH union estimates AND rearranging
+run_pack(["-u", "-r"], "rearrange")
 
-# run count_HIBF_kmers_based_on_binning for the reference, unions and resort result
+# run count_HIBF_kmers_based_on_binning for the reference, unions and rearrange result
 evaluate("reference"), 
 evaluate("union"), 
-evaluate("resort")
+evaluate("rearrange")
