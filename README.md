@@ -8,7 +8,8 @@ The goal of this repository is to enable everyone to reproduce the tests and ben
 * Python 3. I use version 3.8.5.
 * GCC. I use version 9.3.0.
 * CMake. I use version 3.16.3.
-* The Python library `more_itertools` (`pip install more_itertools`). Only needed for the `generate_datasets.py` script.
+* The Python library `more_itertools` (`pip install (...)`). Only needed for the `generate_datasets.py` script.
+* The Python libraries `pandas` and `matplotlib` (`pip install (...)`). Only needed for the `evaluate_hll_measurements.py` script.
 * The SeqAn application `mason2`, download [here](http://packages.seqan.de/mason2/). Only needed for the `generate_datasets.py` script.
 * Dependencies of `genome_updater`, see [here](https://github.com/pirovc/genome_updater). Only needed to download the real dataset.
 
@@ -90,3 +91,12 @@ python compare.py @config/compare_example.config
 ```
 
 The file will print a summary to the command line and also write it to a logfile in the output directory. All other outputs of subprocesses (`chopper pack`, etc.) are saved in that directory as well.
+
+## 5. HyperLogLog measurements
+
+To reproduce the measurements regarding the HyperLogLog estimate quality, the script `evaluate_hll_measurements.py` can be used. It also calls a binary from chopper. See the help menu for different modes. The script should then automatically create a plot similar to the one in the thesis.
+
+```
+python evaluate_hll_measurements.py --help
+python evaluate_hll_measurements.py @config/evaluate_hyperloglog_example.config
+```
