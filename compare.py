@@ -135,7 +135,7 @@ def run_count(extra_flags, name):
         f"           took {round(elapsed_time, 3)} seconds."
     )
 
-    for line in count_proc.stdout.splitlines():
+    for line in count_proc.stderr.splitlines():
         if 'peak memory usage' in line:
             print_and_log("           " + line + '\n')
 
@@ -170,36 +170,50 @@ def run_pack(extra_flags, name):
                 f"---------- packing with {name} done. {line} ----------\n"
                 f"           took {round(elapsed_time, 3)} seconds."
             )
-        elif 'peak memory usage' in line:
+
+    for line in pack_proc.stderr.splitlines():
+        if 'peak memory usage' in line:
             print_and_log("           " + line + '\n')
 
 def evaluate(name):
     kmer_counts_filename = args.output_dir / "exact_kmer_counts.txt"
     binning_filename = args.output_dir / (name + ".binning")
+    evaluation_filename = args.output_dir / f"evaluation_{name}.txt"
 
     proc = subprocess.run([
         args.binary_dir / "count_HIBF_kmers_based_on_binning", 
-        "-f", binning_filename,
+        "-b", binning_filename,
         "-c", kmer_counts_filename,
         "-k", str(args.kmer_size),
-        "-t", str(args.threads)
+        "-t", str(args.threads),
+        "-o", evaluation_filename
         ],
         encoding='utf-8',
         capture_output=True
     )
 
-    output_filename = args.output_dir / f"evaluation_{name}.txt"
+    output_filename = args.output_dir / f"count_HIBF_kmers_based_on_binning_{name}_output.txt"
     handle_outputs(proc, f"count_HIBF_kmers_based_on_binning for the {name}", output_filename)
 
-    maxi, splits, merges, low_level_size = analyze_result(proc.stdout)
+    with open(evaluation_filename, "r") as f:
+        evaluation = f.read()
+
+    peak_mem = ""
+    for line in proc.stderr.splitlines():
+        if "peak memory usage" in line:
+            peak_mem = "           " + line + "\n\n"
+
+    maxi, splits, merges, low_level_size = analyze_result(evaluation)
     print_and_log(
-        f"---------- evaluating with {name} done. ----------\n\n"
+        f"---------- evaluating with {name} done. ----------\n"
+        f"{peak_mem}"
         f"#split bins              : {splits}\n"
         f"#merged bins             : {merges}\n"
         f"largest bin              : {maxi}\n"
         f"largest bin * #bins      : {maxi * args.bins}\n"
         f"lower level k-mers (sum) : {low_level_size}\n"
-        f"\n{proc.stdout if len(proc.stdout.splitlines()) <= 64 else ''}"
+        f"sum of the 2 above lines : {maxi * args.bins + low_level_size}\n"
+        f"\n{evaluation if len(evaluation.splitlines()) <= 64 else ''}"
         )
 
 if not args.no_recount:
