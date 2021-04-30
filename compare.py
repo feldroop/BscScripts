@@ -32,8 +32,6 @@ parser.add_argument("-m", "--max-ratio", default=0.5, type=float,
 parser.add_argument("-t", "--threads", default=1, type=int, help="The number of threads to use.")
 parser.add_argument("-x", "--no-recount", action='store_true', 
                     help="If given, chopper count is not invoked and kmer_counts.txt from output dir is used.")
-parser.add_argument("-p", "--peak-memory", action='store_true',
-                    help="If given, the peak memory usage of chopper processes is computed. Might be a slight slow-down.")
 parser.add_argument("-e", "--exclusively-hlls", action='store_true',
                     help="If given, the hll counts are used for chopper pack instead of the eact counts.")
 
