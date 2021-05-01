@@ -152,6 +152,7 @@ def run_pack(extra_flags, name):
         "-b", str(args.bins),
         "-a", str(args.alpha),
         "-m", str(args.max_ratio),
+        "-t", str(args.threads),
         "-o", binning_filename
         ] + extra_flags,
         encoding='utf-8',
