@@ -93,15 +93,7 @@ python compare.py @config/compare_example.config
 
 The file will print a summary to the command line and also write it to a logfile in the output directory. All other outputs of subprocesses (`chopper pack`, etc.) are saved in that directory as well.
 
-## 5. GC content benchmark
-
-The GC content benchmark can be simply reproduced by calling:
-
-```
-path/to/chopper_build/bin/count_GC_content -f /path/to/fast_file_listing -t num_threads
-```
-
-## 6. HyperLogLog measurements
+## 5. HyperLogLog measurements
 
 To reproduce the measurements regarding the HyperLogLog estimate quality, the script `evaluate_hll_measurements.py` can be used. It also calls a binary from chopper. See the help menu for different modes. The script should then automatically create a plot similar to the one in the thesis.
 
