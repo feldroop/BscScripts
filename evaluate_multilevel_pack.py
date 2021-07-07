@@ -4,6 +4,9 @@ import pathlib
 import os 
 import time 
 
+import collections
+from enum import Enum 
+
 import pandas as pd
 import numpy as np
 
@@ -29,6 +32,7 @@ parser.add_argument("-m", "--max-ratio", default=0.0, type=float,
 parser.add_argument("-t", "--threads", default=1, type=int, help="The number of threads to use.")
 parser.add_argument("-p", "--false-positive-rate", default=0.05, type=float, help="The false positive rate for the IBFs.")
 parser.add_argument("-s", "--num-hash-functions", default=2, type=int, help="The number hash functions for the IBFs.")
+parser.add_argument("-q", "--quick", action="store_true", help="If given, assume that the binning file already exists.")
 
 args = parser.parse_args()
 
@@ -62,53 +66,51 @@ print_and_log(
 binning_filename = args.output_dir / "multilevel.binning"
 output_filename = args.output_dir / "pack_multilevel_full_output.txt"
 
-start_time = time.perf_counter()
+if not args.quick:
+    start_time = time.perf_counter()
 
-pack_proc = subprocess.run([
-    args.chopper_bin_dir / "chopper", 
-    "pack",
-    "-f", args.kmer_count_file,
-    "-d", args.hll_dir,
-    "-b", str(args.bins),
-    "-a", str(args.alpha),
-    "-m", str(args.max_ratio),
-    "-t", str(args.threads),
-    "-p", str(args.false_positive_rate),
-    "-s", str(args.num_hash_functions),
-    "-o", binning_filename
-    ],
-    encoding='utf-8',
-    capture_output=True
-)
-
-elapsed_time = time.perf_counter() - start_time
-
-message = (
-        f"---------- stdout ----------\n"
-        f"{pack_proc.stdout}\n"
-        f"---------- stderr ----------\n"
-        f"{pack_proc.stderr}\n"
-)
-
-if pack_proc.returncode != 0:
-    print_and_log(f"---------- multilevel pack failed with the following output: ----------\n\n"
-                  f"{message}"
+    pack_proc = subprocess.run([
+        args.chopper_bin_dir / "chopper", 
+        "pack",
+        "-f", args.kmer_count_file,
+        "-d", args.hll_dir,
+        "-b", str(args.bins),
+        "-a", str(args.alpha),
+        "-m", str(args.max_ratio),
+        "-t", str(args.threads),
+        "-p", str(args.false_positive_rate),
+        "-s", str(args.num_hash_functions),
+        "-o", binning_filename
+        ],
+        encoding='utf-8',
+        capture_output=True
     )
-    quit()
 
-with open(output_filename, "w+") as f:
-    f.write(message)
+    elapsed_time = time.perf_counter() - start_time
 
-for line in pack_proc.stdout.splitlines():
-    if 'optimum' in line:
-        print_and_log(
-            f"---------- multilevel packing done. {line} ----------\n"
-            f"           took {round(elapsed_time, 3)} seconds."
+    message = (
+            f"---------- stdout ----------\n"
+            f"{pack_proc.stdout}\n"
+            f"---------- stderr ----------\n"
+            f"{pack_proc.stderr}\n"
+    )
+
+    if pack_proc.returncode != 0:
+        print_and_log(f"---------- multilevel pack failed with the following output: ----------\n\n"
+                    f"{message}"
         )
+        quit()
 
-for line in pack_proc.stderr.splitlines():
-    if 'peak memory usage' in line:
-        print_and_log("           " + line + '\n')
+    with open(output_filename, "w+") as f:
+        f.write(message)
+
+
+    print_and_log(
+        f"---------- multilevel packing done. ----------\n"
+        f"           took {round(elapsed_time, 3)} seconds."
+    )
+else:
+    print_and_log("---------- skipped execution. ----------\n")
 
 #################################### execution ####################################
 df = pd.read_csv(
@@ -116,7 +118,93 @@ df = pd.read_csv(
     sep="\t", 
     comment="#", 
     header=None,
-    names=["File", "Bin_Index", "Num_Bins", "Est_Max_TB"]
+    names=["File", "Bin_Index", "Num_Bins", "Cardinality_Estimate"]
 )
 
-print(df)
+def to_tup(s):
+    return tuple(map(int, s.split(";")))
+
+class Bin:
+    class Type(Enum):
+        Split = 0
+        Merged = 1
+    
+    def __init__(self):
+        self.type = self.Type.Split
+        self.cardinality_estimate = 0
+        self.contained_ubs = 0
+        self.num_bins = 0
+        self.child_bins = collections.defaultdict(lambda: Bin())
+
+top_level_bins = collections.defaultdict(lambda: Bin())
+
+for _, (_, *info) in df.iterrows():
+    bin_index, num_bins, cardinality_estimate = tuple(map(to_tup, info))
+
+    curr_level_bins = top_level_bins
+    for level in range(len(bin_index)):
+        curr_bin = curr_level_bins[bin_index[level]]
+
+        curr_bin.contained_ubs += 1
+        if curr_bin.contained_ubs > 1:
+            curr_bin.type = Bin.Type.Merged
+        
+        curr_bin.cardinality_estimate = cardinality_estimate[level]
+        curr_bin.num_bins = num_bins[level]
+        
+        curr_level_bins = curr_bin.child_bins
+
+# statistics for a level of the HIBF
+class Statistics():
+    def __init__(self):
+        self.num_ibs = 0
+        self.num_bins = 0
+        self.split_bins = 0
+        self.merged_bins = 0
+        self.num_split_ubs = 0
+        self.num_merged_ubs = 0
+        self.s_tech = 0
+    
+    def __str__(self):
+        return (
+            f"\n"
+            f"#IBFS:               : {format(self.num_ibs, ',')}\n"
+            f"#bins                : {format(self.num_bins, ',')}\n"
+            f"#split bins          : {format(self.split_bins, ',')}\n"
+            f"#merged bins         : {format(self.merged_bins, ',')}\n"
+            f"#UBs in split bins   : {format(self.num_split_ubs, ',')}\n"
+            f"#UBs in merged bins  : {format(self.num_merged_ubs, ',')}\n"
+            f"Total S_tech         : {format(self.s_tech, ',')}\n"
+        )
+
+levels = collections.defaultdict(lambda: Statistics())
+
+# gather statistics for a given level
+def gather_statistics(level, bins):
+    stat = levels[level]
+    stat.num_ibs += 1
+    stat.num_bins += len(bins)
+
+    max_bin_card = 0
+
+    for bin in bins.values():
+        if bin.type == Bin.Type.Split:
+            stat.split_bins += 1
+            stat.num_split_ubs += bin.contained_ubs
+        
+        else:
+            stat.merged_bins += 1
+            stat.num_merged_ubs += bin.contained_ubs
+            gather_statistics(level + 1, bin.child_bins)
+        
+        max_bin_card = max(max_bin_card, bin.cardinality_estimate)
+
+    stat.s_tech += max_bin_card * len(bins)
+        
+gather_statistics(0, top_level_bins)
+
+
+for level, stat in levels.items():
+    print(f"Level {level}:\n{stat}")
+
+print("Total S_tech = sum over all IBFs on the given level of (#bins * <maximum bin cardinality>)\n")
