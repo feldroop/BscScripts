@@ -24,8 +24,9 @@ cd chopper_build
 cmake ../Chopper
 ```
 
-You can run the test to make sure everything works.
+You can run the tests to make sure everything works. Make sure to also run just `make`, because some of the smaller executables don't have tests. They are not built when only running `make test`.
 ```
+make
 make test
 ```
 
