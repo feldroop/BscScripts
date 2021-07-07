@@ -9,8 +9,7 @@ from more_itertools import interleave
 import pandas as pd 
 import matplotlib.pyplot as plt 
 import matplotlib.colors as mcolors
-
-import numpy as np 
+from matplotlib import rcParams
 
 #################################### command line interface ####################################
 parser = argparse.ArgumentParser(description="Measure quality of the chopper HyperLogLog implementation.",
@@ -48,7 +47,7 @@ fasta_file = None
 if args.fasta_output:
 
     if not args.length or not args.number_seqs:
-        print("Must specify --length and --number-segs to generate sequences.")
+        print("Must specify --length and --number-seqs to generate sequences.")
         quit()
 
     print("Generating sequences...")
@@ -113,6 +112,14 @@ df = pd.read_csv(
     header=0,
 )
 
+# font
+plt.rcParams['font.family'] = "CMU Serif"
+large_fonts, small_fonts = 28, 22
+plt.rcParams['font.size'] = large_fonts
+plt.rcParams['axes.labelsize'] = large_fonts
+plt.rcParams['ytick.labelsize'] = small_fonts
+plt.rcParams['xtick.labelsize'] = small_fonts
+
 fig = plt.figure()
 ax = plt.gca()
 
@@ -127,12 +134,9 @@ for reg_size, group in df.groupby('sketch_register_size'):
         y=group['expected_relative_error'].iloc[0], 
         linestyle='dotted',
         label=f"{reg_size} registers/bytes",
-        color=colors[reg_size]
+        color=colors[reg_size],
+        lw=2.5
     )
-
-ax.set_ylim(0.0, 0.1)
-ax.set_ylabel("Relative error")
-ax.set_xlabel("Sequence length")
 
 pos = 1
 last_seq_length = None
@@ -154,9 +158,30 @@ for (seq_length, reg_size), group in df.groupby(['sequence_length','sketch_regis
     for lines in boxplot.values():
         for line in lines:
             line.set_color(colors[reg_size])
-            line.set_linewidth(1.5)
+            line.set_linewidth(2)
         
     pos += 1
-    
-plt.legend()
+
+# labels
+ax.set_ylim(0.0, 0.1)
+ax.set_ylabel("Relative error")
+ax.set_xlabel("Sequence length")
+
+num_seq_lengths = df['sequence_length'].nunique()
+num_reg_sizes = df['sketch_register_size'].nunique()
+
+x_ticks = [(num_reg_sizes + 1) / 2 + i * (num_reg_sizes + 1) for i in range(num_seq_lengths)]
+ax.set_xticks(x_ticks)
+ax.set_xticklabels(["100,000", "1,000,000", "10,000,000"])
+
+# axis and background styling
+for spine in ax.spines.values():
+    spine.set_color('#DDDDDD')
+
+ax.tick_params(bottom=False, left=False)
+ax.set_axisbelow(True)
+ax.yaxis.grid(True, color='#EEEEEE')
+ax.xaxis.grid(False)
+
+plt.legend(fontsize=small_fonts)
 plt.show()
