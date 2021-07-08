@@ -8,7 +8,6 @@ import collections
 from enum import Enum 
 
 import pandas as pd
-import numpy as np
 
 # timestamp
 t = time.localtime()
@@ -107,7 +106,7 @@ if not args.quick:
 
     print_and_log(
         f"---------- multilevel packing done. ----------\n"
-        f"           took {round(elapsed_time, 3)} seconds."
+        f"           took {round(elapsed_time, 3)} seconds.\n"
     )
 else:
     print_and_log("---------- skipped execution. ----------\n")
@@ -121,9 +120,7 @@ df = pd.read_csv(
     names=["File", "Bin_Index", "Num_Bins", "Cardinality_Estimate"]
 )
 
-def to_tup(s):
-    return tuple(map(int, s.split(";")))
-
+# represents a technical bin
 class Bin:
     class Type(Enum):
         Split = 0
@@ -138,6 +135,10 @@ class Bin:
 
 top_level_bins = collections.defaultdict(lambda: Bin())
 
+def to_tup(s):
+    return tuple(map(int, s.split(";")))
+
+# extract data from flat df and turn into useful hierarchical structure
 for _, (_, *info) in df.iterrows():
     bin_index, num_bins, cardinality_estimate = tuple(map(to_tup, info))
 
@@ -183,7 +184,7 @@ class Statistics():
 
 levels = collections.defaultdict(lambda: Statistics())
 
-# gather statistics for a given level
+# recursively gather statistics for a given set of bins and a given level
 def gather_statistics(level, bins):
     stat = levels[level]
     stat.num_ibs += 1
@@ -208,11 +209,12 @@ def gather_statistics(level, bins):
         max_bin_card = max(max_bin_card, bin.cardinality_estimate)
 
     stat.s_tech += max_bin_card * len(bins)
-        
+
+# gather all statistics
 gather_statistics(0, top_level_bins)
 
-
+# print and log statistics for all levels
 for level, stat in levels.items():
-    print(f"Level {level}:\n{stat}")
+    print_and_log(f"Level {level}:\n{stat}")
 
-print("Total S_tech = sum over all IBFs on the given level of (#bins * <maximum bin cardinality>)\n")
+print_and_log("Total S_tech = sum over all IBFs on the given level of (#bins * <maximum bin cardinality>)\n")
