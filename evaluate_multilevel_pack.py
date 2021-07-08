@@ -197,13 +197,13 @@ def gather_statistics(level, bins):
         local_num_bins += bin.num_bins
 
         if bin.type == Bin.Type.Split:
-            stat.split_bins += 1
+            stat.split_bins += bin.num_bins
 
             stat.num_split_ubs += bin.contained_ubs
             stat.max_ubs_in_split = max(stat.max_ubs_in_split, bin.num_bins)
         
         else:
-            stat.merged_bins += 1
+            stat.merged_bins += bin.num_bins
             stat.num_merged_ubs += bin.contained_ubs
             stat.max_ubs_in_merged = max(stat.max_ubs_in_merged, len(bin.child_bins))
             gather_statistics(level + 1, bin.child_bins)
