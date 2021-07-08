@@ -190,9 +190,11 @@ def gather_statistics(level, bins):
     stat.num_ibs += 1
 
     max_bin_card = 0
+    local_num_bins = 0
 
     for bin in bins.values():
         stat.num_bins += bin.num_bins
+        local_num_bins += bin.num_bins
 
         if bin.type == Bin.Type.Split:
             stat.split_bins += 1
@@ -208,7 +210,7 @@ def gather_statistics(level, bins):
         
         max_bin_card = max(max_bin_card, bin.cardinality_estimate)
 
-    stat.s_tech += max_bin_card * len(bins)
+    stat.s_tech += max_bin_card * local_num_bins
 
 # gather all statistics
 gather_statistics(0, top_level_bins)
