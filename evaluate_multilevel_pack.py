@@ -163,18 +163,22 @@ class Statistics():
         self.merged_bins = 0
         self.num_split_ubs = 0
         self.num_merged_ubs = 0
+        self.max_ubs_in_split = 0
+        self.max_ubs_in_merged = 0
         self.s_tech = 0
     
     def __str__(self):
         return (
             f"\n"
-            f"#IBFS:               : {format(self.num_ibs, ',')}\n"
-            f"#bins                : {format(self.num_bins, ',')}\n"
-            f"#split bins          : {format(self.split_bins, ',')}\n"
-            f"#merged bins         : {format(self.merged_bins, ',')}\n"
-            f"#UBs in split bins   : {format(self.num_split_ubs, ',')}\n"
-            f"#UBs in merged bins  : {format(self.num_merged_ubs, ',')}\n"
-            f"Total S_tech         : {format(self.s_tech, ',')}\n"
+            f"#IBFS:                 : {self.num_ibs:,}\n"
+            f"#bins                  : {self.num_bins:,}\n"
+            f"#split bins            : {self.split_bins:,}\n"
+            f"#merged bins           : {self.merged_bins:,}\n"
+            f"#UBs in split bins     : {self.num_split_ubs:,}\n"
+            f"#UBs in merged bins    : {self.num_merged_ubs:,}\n"
+            f"max #UBs in split bin  : {self.max_ubs_in_split:,}\n"
+            f"max #UBs in merged bin : {self.max_ubs_in_merged:,}\n"
+            f"Total S_tech           : {self.s_tech:,}\n"
         )
 
 levels = collections.defaultdict(lambda: Statistics())
@@ -183,18 +187,22 @@ levels = collections.defaultdict(lambda: Statistics())
 def gather_statistics(level, bins):
     stat = levels[level]
     stat.num_ibs += 1
-    stat.num_bins += len(bins)
 
     max_bin_card = 0
 
     for bin in bins.values():
+        stat.num_bins += bin.num_bins
+
         if bin.type == Bin.Type.Split:
             stat.split_bins += 1
+
             stat.num_split_ubs += bin.contained_ubs
+            stat.max_ubs_in_split = max(stat.max_ubs_in_split, bin.num_bins)
         
         else:
             stat.merged_bins += 1
             stat.num_merged_ubs += bin.contained_ubs
+            stat.max_ubs_in_merged = max(stat.max_ubs_in_merged, len(bin.child_bins))
             gather_statistics(level + 1, bin.child_bins)
         
         max_bin_card = max(max_bin_card, bin.cardinality_estimate)
