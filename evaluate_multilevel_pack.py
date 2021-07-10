@@ -9,9 +9,13 @@ from enum import Enum
 
 import pandas as pd
 
+# TODO
+# FPR adjustment into cardinality estimation
+# Bloom filter constant
+
 # timestamp
 t = time.localtime()
-timestamp = f"{t.tm_year}-{t.tm_mon}-{t.tm_mday}_{t.tm_hour}-{t.tm_min}-{ t.tm_sec}"
+timestamp = f"{t.tm_year}-{t.tm_mon}-{t.tm_mday}_{t.tm_hour}-{t.tm_min}-{t.tm_sec}"
 
 #################################### configuration ####################################
 parser = argparse.ArgumentParser(description="Run the multilevel pack algorithm and evaluate the results",
@@ -79,6 +83,8 @@ if not args.quick:
         "-t", str(args.threads),
         "-p", str(args.false_positive_rate),
         "-s", str(args.num_hash_functions),
+        "-u",
+        "-r",
         "-o", binning_filename
         ],
         encoding='utf-8',
@@ -111,7 +117,7 @@ if not args.quick:
 else:
     print_and_log("---------- skipped execution. ----------\n")
 
-#################################### execution ####################################
+#################################### evaluation ####################################
 df = pd.read_csv(
     binning_filename, 
     sep="\t", 
