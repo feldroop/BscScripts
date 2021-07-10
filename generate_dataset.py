@@ -47,7 +47,8 @@ SMALL_INDEL_RATE = args.indel
 
 # seed management
 SEEDS_GIVEN = not args.random_seeds is None
-RANDOM_SEEDS = ast.literal_eval(args.random_seeds.strip(' ')) if SEEDS_GIVEN else []
+RANDOM_SEEDS = ast.literal_eval(args.random_seeds.strip(' "')) if SEEDS_GIVEN else []
+print(RANDOM_SEEDS)
 seed_index = 0
 
 def next_random():

@@ -146,18 +146,18 @@ def to_tup(s):
 
 # extract data from flat df and turn into useful hierarchical structure
 for _, (_, *info) in df.iterrows():
-    bin_index, num_bins, cardinality_estimate = tuple(map(to_tup, info))
+    infos = tuple(map(to_tup, info))
 
     curr_level_bins = top_level_bins
-    for level in range(len(bin_index)):
-        curr_bin = curr_level_bins[bin_index[level]]
+    for level, (bin_index, num_bins, cardi_est) in enumerate(zip(*infos)):
+        curr_bin = curr_level_bins[bin_index]
 
         curr_bin.contained_ubs += 1
         if curr_bin.contained_ubs > 1:
             curr_bin.type = Bin.Type.Merged
         
-        curr_bin.cardinality_estimate = cardinality_estimate[level]
-        curr_bin.num_bins = num_bins[level]
+        curr_bin.cardinality_estimate = cardi_est
+        curr_bin.num_bins = num_bins
         
         curr_level_bins = curr_bin.child_bins
 
