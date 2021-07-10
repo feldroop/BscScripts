@@ -27,7 +27,7 @@ parser.add_argument("-k", "--kmer-count-file", required=True, type=pathlib.Path,
                     help="The file for chopper pack in which all sequence files are listed with k-mer counts.")
 parser.add_argument("-c", "--chopper-bin-dir", required=True, type=pathlib.Path, help="The binary directory of chopper.")
 parser.add_argument("-d", "--hll-dir", required=True, help="The dir where the hlls are cached.", type=pathlib.Path)
-parser.add_argument("-l", "--log", default=f"{timestamp}_log.txt", help="The name for the log file (not the whole path).")
+parser.add_argument("-n", "--name", default=f"{timestamp}_log.txt", help="The name for the log file (not the whole path).")
 parser.add_argument("-b", "--bins", required=True, type=int, help="The number of technical bins for chopper pack.")
 parser.add_argument("-a", "--alpha", default=1.2, type=float, help="The alpha for the internal binning algorithm.")
 parser.add_argument("-m", "--max-ratio", default=0.0, type=float, 
@@ -44,7 +44,7 @@ if not os.path.isdir(args.output_dir):
     os.mkdir(args.output_dir)
 
 # setup logging
-log_path = args.output_dir / args.log
+log_path = args.output_dir / f"{args.name}_log.txt"
 
 def print_and_log(message):
     print(message)
@@ -66,7 +66,7 @@ print_and_log(
     f"Hash functions  : {args.num_hash_functions}\n"
 )
 
-binning_filename = args.output_dir / "multilevel.binning"
+binning_filename = args.output_dir / f"{args.name}.binning"
 output_filename = args.output_dir / "pack_multilevel_full_output.txt"
 
 if not args.quick:
