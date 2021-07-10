@@ -3,6 +3,7 @@ import subprocess
 import pathlib 
 import os 
 import time 
+import math 
 
 import collections
 from enum import Enum 
@@ -51,6 +52,18 @@ def print_and_log(message):
     with open(log_path, "a+") as f:
         f.write(message + '\n')
 
+# compute bloom factor scaling and fpr correction factors
+bf_scale = - args.num_hash_functions / (
+    math.log(1 - math.exp(math.log(args.false_positive_rate) / args.num_hash_functions))
+)
+
+fp_correction = [0.0] * (args.bins + 1)
+denominator = math.log(1 - math.exp(math.log(args.false_positive_rate) / args.num_hash_functions))
+
+for i in range(1, args.bins + 1):
+    tmp = 1.0 - (1 - args.false_positive_rate) ** i
+    fp_correction[i] = math.log(1 - math.exp(math.log(tmp) / args.num_hash_functions)) / denominator
+
 print_and_log(
     "\n---------- configuration: ----------\n\n"
     f"output directory: {args.output_dir}\n"
@@ -64,6 +77,7 @@ print_and_log(
     f"threads         : {args.threads}\n"
     f"FPR             : {args.false_positive_rate}\n"
     f"Hash functions  : {args.num_hash_functions}\n"
+    f"BF scaling      : {bf_scale}\n"
 )
 
 binning_filename = args.output_dir / f"{args.name}.binning"
@@ -186,6 +200,7 @@ class Statistics():
             f"max #UBs in split bin  : {self.max_ubs_in_split:,}\n"
             f"max #UBs in merged bin : {self.max_ubs_in_merged:,}\n"
             f"Total S_tech           : {self.s_tech:,}\n"
+            f"Estimated Space usage  : {math.ceil(self.s_tech * bf_scale / 8):,} byte\n"
         )
 
 levels = collections.defaultdict(lambda: Statistics())
@@ -214,15 +229,18 @@ def gather_statistics(level, bins):
             stat.max_ubs_in_merged = max(stat.max_ubs_in_merged, len(bin.child_bins))
             gather_statistics(level + 1, bin.child_bins)
         
-        max_bin_card = max(max_bin_card, bin.cardinality_estimate)
+        max_bin_card = max(max_bin_card, math.ceil(bin.cardinality_estimate * fp_correction[bin.num_bins]))
 
     stat.s_tech += max_bin_card * local_num_bins
 
 # gather all statistics
 gather_statistics(0, top_level_bins)
 
+total_space_usage_est = 0
 # print and log statistics for all levels
 for level, stat in levels.items():
     print_and_log(f"Level {level}:\n{stat}")
+    total_space_usage_est += math.ceil(stat.s_tech * bf_scale / 8)
 
-print_and_log("Total S_tech = sum over all IBFs on the given level of (#bins * <maximum bin cardinality>)\n")
+print_and_log("Total S_tech = sum over all IBFs on the given level of (#bins * <maximum bin cardinality>)")
+print_and_log(f"Estimated total space usage: {total_space_usage_est:,} bytes\n")
