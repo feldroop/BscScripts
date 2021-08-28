@@ -4,6 +4,7 @@ import pathlib
 import os 
 import time 
 import math 
+import ast 
 
 import collections
 from enum import Enum 
@@ -57,10 +58,11 @@ bf_scale = - args.num_hash_functions / (
     math.log(1 - math.exp(math.log(args.false_positive_rate) / args.num_hash_functions))
 )
 
-fp_correction = [0.0] * (args.bins + 1)
+t_max = args.bins + 63
+fp_correction = [0.0] * (t_max + 1)
 denominator = math.log(1 - math.exp(math.log(args.false_positive_rate) / args.num_hash_functions))
 
-for i in range(1, args.bins + 1):
+for i in range(1, t_max + 1):
     tmp = 1.0 - (1 - args.false_positive_rate) ** i
     fp_correction[i] = math.log(1 - math.exp(math.log(tmp) / args.num_hash_functions)) / denominator
 
@@ -99,6 +101,7 @@ if not args.quick:
         "-s", str(args.num_hash_functions),
         "-u",
         "-r",
+        "--debug",
         "-o", binning_filename
         ],
         encoding='utf-8',
@@ -137,7 +140,7 @@ df = pd.read_csv(
     sep="\t", 
     comment="#", 
     header=None,
-    names=["File", "Bin_Index", "Num_Bins", "Cardinality_Estimate"]
+    names=["File", "Bin_Index", "Num_Bins", "Cardinality_Sum", "Score", "Correction", "T_Max"]
 )
 
 # represents a technical bin
@@ -148,7 +151,7 @@ class Bin:
     
     def __init__(self):
         self.type = self.Type.Split
-        self.cardinality_estimate = 0
+        self.cardinality_sum = 0
         self.contained_ubs = 0
         self.num_bins = 0
         self.child_bins = collections.defaultdict(lambda: Bin())
@@ -156,21 +159,21 @@ class Bin:
 top_level_bins = collections.defaultdict(lambda: Bin())
 
 def to_tup(s):
-    return tuple(map(int, s.split(";")))
+    return tuple(map(ast.literal_eval, s.split(";")))
 
 # extract data from flat df and turn into useful hierarchical structure
 for _, (_, *info) in df.iterrows():
     infos = tuple(map(to_tup, info))
 
     curr_level_bins = top_level_bins
-    for level, (bin_index, num_bins, cardi_est) in enumerate(zip(*infos)):
+    for level, (bin_index, num_bins, cardi_sum, *_) in enumerate(zip(*infos)):
         curr_bin = curr_level_bins[bin_index]
 
         curr_bin.contained_ubs += 1
         if curr_bin.contained_ubs > 1:
             curr_bin.type = Bin.Type.Merged
         
-        curr_bin.cardinality_estimate = cardi_est
+        curr_bin.cardinality_sum = cardi_sum
         curr_bin.num_bins = num_bins
         
         curr_level_bins = curr_bin.child_bins
@@ -178,7 +181,7 @@ for _, (_, *info) in df.iterrows():
 # statistics for a level of the HIBF
 class Statistics():
     def __init__(self):
-        self.num_ibs = 0
+        self.num_ibfs = 0
         self.num_bins = 0
         self.split_bins = 0
         self.merged_bins = 0
@@ -191,7 +194,7 @@ class Statistics():
     def __str__(self):
         return (
             f"\n"
-            f"#IBFS:                 : {self.num_ibs:,}\n"
+            f"#IBFS:                 : {self.num_ibfs:,}\n"
             f"#bins                  : {self.num_bins:,}\n"
             f"#split bins            : {self.split_bins:,}\n"
             f"#merged bins           : {self.merged_bins:,}\n"
@@ -208,7 +211,7 @@ levels = collections.defaultdict(lambda: Statistics())
 # recursively gather statistics for a given set of bins and a given level
 def gather_statistics(level, bins):
     stat = levels[level]
-    stat.num_ibs += 1
+    stat.num_ibfs += 1
 
     max_bin_card = 0
     local_num_bins = 0
@@ -226,10 +229,10 @@ def gather_statistics(level, bins):
         else:
             stat.merged_bins += bin.num_bins
             stat.num_merged_ubs += bin.contained_ubs
-            stat.max_ubs_in_merged = max(stat.max_ubs_in_merged, len(bin.child_bins))
+            stat.max_ubs_in_merged = max(stat.max_ubs_in_merged, bin.contained_ubs)
             gather_statistics(level + 1, bin.child_bins)
         
-        max_bin_card = max(max_bin_card, math.ceil(bin.cardinality_estimate * fp_correction[bin.num_bins]))
+        max_bin_card = max(max_bin_card, math.ceil(bin.cardinality_sum * fp_correction[bin.num_bins]))
 
     stat.s_tech += max_bin_card * local_num_bins
 
