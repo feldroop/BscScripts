@@ -58,14 +58,6 @@ bf_scale = - args.num_hash_functions / (
     math.log(1 - math.exp(math.log(args.false_positive_rate) / args.num_hash_functions))
 )
 
-t_max = args.bins + 63
-fp_correction = [0.0] * (t_max + 1)
-denominator = math.log(1 - math.exp(math.log(args.false_positive_rate) / args.num_hash_functions))
-
-for i in range(1, t_max + 1):
-    tmp = 1.0 - (1 - args.false_positive_rate) ** i
-    fp_correction[i] = math.log(1 - math.exp(math.log(tmp) / args.num_hash_functions)) / denominator
-
 print_and_log(
     "\n---------- configuration: ----------\n\n"
     f"output directory: {args.output_dir}\n"
@@ -155,6 +147,7 @@ class Bin:
         self.contained_ubs = 0
         self.num_bins = 0
         self.child_bins = collections.defaultdict(lambda: Bin())
+        self.correction = 1
 
 top_level_bins = collections.defaultdict(lambda: Bin())
 
@@ -166,12 +159,13 @@ for _, (_, *info) in df.iterrows():
     infos = tuple(map(to_tup, info))
 
     curr_level_bins = top_level_bins
-    for level, (bin_index, num_bins, cardi_sum, *_) in enumerate(zip(*infos)):
+    for level, (bin_index, num_bins, cardi_sum, _, correction, _) in enumerate(zip(*infos)):
         curr_bin = curr_level_bins[bin_index]
 
         curr_bin.contained_ubs += 1
         if curr_bin.contained_ubs > 1:
             curr_bin.type = Bin.Type.Merged
+            curr_bin.correction = correction
         
         curr_bin.cardinality_sum = cardi_sum
         curr_bin.num_bins = num_bins
@@ -232,7 +226,7 @@ def gather_statistics(level, bins):
             stat.max_ubs_in_merged = max(stat.max_ubs_in_merged, bin.contained_ubs)
             gather_statistics(level + 1, bin.child_bins)
         
-        max_bin_card = max(max_bin_card, math.ceil(bin.cardinality_sum * fp_correction[bin.num_bins]))
+        max_bin_card = max(max_bin_card, math.ceil(bin.cardinality_sum * bin.correction))
 
     stat.s_tech += max_bin_card * local_num_bins
 
