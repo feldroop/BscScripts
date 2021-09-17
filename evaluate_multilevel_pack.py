@@ -54,9 +54,9 @@ def print_and_log(message):
         f.write(message + '\n')
 
 # compute bloom factor scaling and fpr correction factors
-bf_scale = - args.num_hash_functions / (
-    math.log(1 - math.exp(math.log(args.false_positive_rate) / args.num_hash_functions))
-)
+# bf_scale = - args.num_hash_functions / (
+#     math.log(1 - math.exp(math.log(args.false_positive_rate) / args.num_hash_functions))
+# )
 
 print_and_log(
     "\n---------- configuration: ----------\n\n"
@@ -71,7 +71,7 @@ print_and_log(
     f"threads         : {args.threads}\n"
     f"FPR             : {args.false_positive_rate}\n"
     f"Hash functions  : {args.num_hash_functions}\n"
-    f"BF scaling      : {bf_scale}\n"
+    #f"BF scaling      : {bf_scale}\n"
 )
 
 binning_filename = args.output_dir / f"{args.name}.binning"
@@ -190,14 +190,15 @@ class Statistics():
             f"\n"
             f"#IBFS:                 : {self.num_ibfs:,}\n"
             f"#bins                  : {self.num_bins:,}\n"
+            f"avg #bins per IBF      : {self.num_bins/self.num_ibfs:,}\n"
             f"#split bins            : {self.split_bins:,}\n"
             f"#merged bins           : {self.merged_bins:,}\n"
             f"#UBs in split bins     : {self.num_split_ubs:,}\n"
             f"#UBs in merged bins    : {self.num_merged_ubs:,}\n"
             f"max #UBs in split bin  : {self.max_ubs_in_split:,}\n"
             f"max #UBs in merged bin : {self.max_ubs_in_merged:,}\n"
-            f"Total S_tech           : {self.s_tech:,}\n"
-            f"Estimated Space usage  : {math.ceil(self.s_tech * bf_scale / 8):,} byte\n"
+            #f"Total S_tech           : {self.s_tech:,}\n"
+            #f"Estimated Space usage  : {math.ceil(self.s_tech * bf_scale / 8):,} byte\n"
         )
 
 levels = collections.defaultdict(lambda: Statistics())
@@ -233,11 +234,11 @@ def gather_statistics(level, bins):
 # gather all statistics
 gather_statistics(0, top_level_bins)
 
-total_space_usage_est = 0
+#total_space_usage_est = 0
 # print and log statistics for all levels
 for level, stat in levels.items():
     print_and_log(f"Level {level}:\n{stat}")
-    total_space_usage_est += math.ceil(stat.s_tech * bf_scale / 8)
+    #total_space_usage_est += math.ceil(stat.s_tech * bf_scale / 8)
 
-print_and_log("Total S_tech = sum over all IBFs on the given level of (#bins * <maximum bin cardinality>)")
-print_and_log(f"Estimated total space usage: {total_space_usage_est:,} bytes\n")
+#print_and_log("Total S_tech = sum over all IBFs on the given level of (#bins * <maximum bin cardinality>)")
+#print_and_log(f"Estimated total space usage: {total_space_usage_est:,} bytes\n")
